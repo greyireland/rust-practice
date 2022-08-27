@@ -1,6 +1,10 @@
-use std::fmt::{Display, Formatter};
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 use std::future::pending;
 use std::process::id;
+use std::string::ParseError;
+
+use anyhow::bail;
 
 use crate::List::{Cons, Nil};
 
@@ -441,6 +445,237 @@ fn unused_fn() {
     println!("{:?}", "a");
 }
 
+//泛型（类型参数）
+// 定义泛型类型或泛型函数之类的东西时，我们会用 <A> 或者 <T> 这类标记 作为类型的代号
+// 就像函数的形参一样。在使用时，为把 <A>、<T> 具体化，我们 会把类型说明像实参一样使用
+// 像是 <i32> 这样。这两种把（泛型的或具体的）类型 当作参数的用法就是类型参数。
+struct A {}
+
+struct Single(A);
+
+struct SingleGeneric<T>(T);
+
+// 用于函数
+fn min<T>(a: T, b: T) -> T {
+    a
+}
+
+// 用于impl实现
+impl<T> SingleGeneric<T> {
+    fn new() {}
+}
+
+//泛型以trait约束
+fn print<T: Display>(t: T) {
+    println!("{}", t);
+}
+
+// 多重约束
+fn compare<T: Debug + Display>(t: &T) {
+    println!("{:?}", t);//Debug
+    println!("{}", t);//Display
+}
+// where约束
+
+// 作用域
+//RAII获取资源及初始化，完结后销毁 constructor开始--中间可使用--finally结束
+// 析构函数Drop
+struct ToDrop;
+
+impl Drop for ToDrop {
+    // 这个drop算是销毁之前的事件？
+    fn drop(&mut self) {
+        println!("{:?}", "instance droped");
+    }
+}
+
+fn ownership() {
+    let immutable_box = Box::new(5u32);
+
+    let mut b = immutable_box;//改变所有权并改变可变性
+
+    *b = 10;
+    println!("{:?}", b);
+
+    // ref模式
+    let c = 'q';
+    let ref b = c;
+    let ref d = &c;//b和d是等价的
+}
+//还可以部分移动
+// 正常情况都使用借用
+
+//生命周期
+fn failed_borrow<'a>(v: &'a i32) {
+    let x = 1;
+    // let y: &'a i32 = &x; //报错，因为生命周期不够长
+    // let b = v;
+}
+
+//结构体中的变量生命周期必须比结构体生命周期长（或者一样长）
+struct NamedBorrowed<'a> {
+    x: &'a i32,
+}
+//大部分生命周期都可以省略，由编译器自动判定
+
+//trait==接口golang interface
+//Clone 从&T创建副本T
+//Copy 复制语义，非转移语义
+//Debug打印 Default空实例
+
+struct Sheep {}
+
+struct Cow {}
+
+trait Animal {
+    // 实例方法签名
+    fn noise(&self) -> &'static str;
+}
+
+// 实现 `Sheep` 的 `Animal` trait。
+impl Animal for Sheep {
+    fn noise(&self) -> &'static str {
+        "baaaaah!"
+    }
+}
+
+// 实现 `Cow` 的 `Animal` trait。
+impl Animal for Cow {
+    fn noise(&self) -> &'static str {
+        "moooooo!"
+    }
+}
+
+// 返回一些实现 Animal 的结构体，但是在编译时我们不知道哪个结构体。
+fn random_animal(random_number: f64) -> Box<dyn Animal> {
+    if random_number < 0.5 {
+        Box::new(Sheep {})
+    } else {
+        Box::new(Cow {})
+    }
+}
+//Drop常见的资源类的都实现了Drop，如Box,Vec,String,File,Process
+
+//Iterator迭代器，默认for使用into_iter()，会转移资源,iter()是借用，不会转移资源
+// impl Iterator<Item=i32>简化返回的
+fn combine_vecs(
+    v: Vec<i32>,
+    u: Vec<i32>,
+) -> impl Iterator<Item=i32> {
+    v.into_iter().chain(u.into_iter()).cycle()
+}
+
+//rust赋值默认行为是移动，有时候需要用到两份资源，所以可以使用clone
+// 实现Clone和Copy
+#[derive(Debug, Clone, Copy)]
+struct HasCopyA {
+    a: i32,//i32简单类型，实现了Copy所有整个结构体是copy的
+}
+
+// 只实现了 `Clone` trait，需要手动clone
+#[derive(Clone, Debug)]
+struct HasCloneB(Box<i32>, Box<i32>);
+
+//如果都是内置简单类型相当于自动实现了Clone和Copy，
+// 如果是结构体想实现Copy必须内部所有字段也实现Copy，不然是没用的
+
+fn clone_copy() {
+    let a = HasCopyA { a: 1 };
+    let b = a;//隐式Copy
+    println!("{:?}", a);
+    println!("{:?}", b);
+
+    let c = HasCloneB(Box::new(1), Box::new(2));
+    let d = c.clone();//显式clone
+    println!("{:?}", c);
+    println!("{:?}", d);
+}
+
+//父trait，trait可以继承
+trait Person {
+    fn name(&self) -> String;
+}
+
+trait Student: Person {
+    fn age(&self) -> i32;
+}
+
+struct Me {
+    name: String,
+    age: i32,
+}
+
+impl Student for Me {
+    fn age(&self) -> i32 {
+        self.age
+    }
+}
+
+impl Person for Me {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+}
+
+fn hello(v: &dyn Student) {
+    println!("name{:?},age{}", v.name(), v.age());
+}
+
+fn parent_trait_demo() {
+    hello(&Me { name: "a".to_string(), age: 1 })
+}
+
+//宏 模版代码，可以解析语法
+macro_rules! say_hello {
+    ()=>(
+        println!("hello!")
+    )
+}
+fn macro_demo() {
+    say_hello!();
+}
+
+//错误处理 Option 和Result<T,E>更加丰富的Option
+//anyhow::Result<T,E>
+//panic!和golang panic("")一致
+// Option<T>两个选择Some(T),None
+fn option_demo() {
+    let a = Some(1);
+
+    if let Some(v) = a {
+        println!("{:?}", v);
+    } else {
+        println!("{:?}", "error");
+    }
+    let b = a.unwrap_or_default();
+    println!("{:?}", b);
+}
+
+fn result_demo() -> Result<i32, Box<dyn Error>> {
+    let a = "a".parse::<i32>()?;
+    let b = "2".parse::<i32>()?;
+    Ok(a * b)
+}
+
+fn anyhow_demo() -> anyhow::Result<i32> {
+    let a = "1".parse::<i32>()?;
+    let b = "2".parse::<i32>()?;
+    let c = a * b;
+    println!("{:?}", c);
+    Ok(c)
+}
+
+fn anyhow2_demo() -> anyhow::Result<i32> {
+    let a = "a".parse::<i32>().map_err(|err| {
+        println!("{:?}", err);//提前日志记录
+        err//原路返回
+    }).unwrap_or_default();
+    let b = "2".parse::<i32>()?;
+    let c = a * b;
+    println!("{:?}", c);
+    Ok(c)
+}
+
 fn main() {
-    mod_demo();
+    anyhow2_demo().unwrap();
 }
