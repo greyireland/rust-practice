@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::future::pending;
+use std::process::id;
 
 use crate::List::{Cons, Nil};
 
@@ -355,6 +356,91 @@ fn if_let_demo() {
     }
 }
 
+struct Func {
+    a: String,
+}
+
+impl Func {
+    fn new() -> Self {
+        Func {
+            a: "a".to_owned()
+        }
+    }
+    fn hi(self) {
+        println!("{:?}", self.a);
+    }
+    fn hi2(&self) {
+        println!("{:?}", self.a);
+    }
+    fn hi3(&mut self) {
+        self.a = "aa".to_string();
+        println!("{:?}", self.a);
+    }
+}
+
+fn func_demo() {
+    fn test(i: i32) -> (i32, i32) {
+        (i, i + 1)
+    }
+    println!("{:?}", test(1));
+    let mut f = Func::new();
+    // f.hi();//move
+    f.hi2();
+    f.hi3();
+    // 借用改变值，需要函数声明为mut，move|x|{}会强制move
+    let mut f2 = |a| {
+        println!("{:?}", a);
+        (&f).hi2();
+    };
+    f2(1111);
+}
+
+fn fn_iter() {
+    let a = vec![1, 2, 3];
+    let contains = a.iter().any(|&x| x == 2);
+    println!("{:?}", contains);
+    // iter引用一次，find引用一次，所以是两次引用
+    let item = a.iter().find(|&&x| x == 2).unwrap();
+    println!("{:?}", item);
+    let b = a.into_iter().any(|x| x == 2);
+    println!("{:?}", b);
+    // println!("{:?}", a);//err moved
+}
+
+fn str_str() {
+    let hello = "hello world";
+    let h = "wor";
+    if let Some(idx) = hello.find(h) {
+        println!("{:?}", idx);
+        let cut = &hello[idx + 3..idx + 5];
+        println!("{:?}", cut);
+    }
+}
+//pub mod x;
+//pub use mod::x;
+
+
+mod my_mod {
+    pub fn hello() {
+        println!("{:?}", "hello");
+    }
+}
+
+fn mod_demo() {
+    hello();
+    use my_mod::hello;
+    hello();
+}
+
+// crate
+// extern crate rary; // 在 Rust 2015 版或更早版本需要这个导入语句
+//cargo
+// attribute
+#[allow(dead_code)]
+fn unused_fn() {
+    println!("{:?}", "a");
+}
+
 fn main() {
-    if_let_demo();
+    mod_demo();
 }
