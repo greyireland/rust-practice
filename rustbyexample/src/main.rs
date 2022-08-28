@@ -1,8 +1,16 @@
+use std::{env, time};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
+use std::fs::File;
 use std::future::pending;
+use std::io::{Read, Write};
+use std::path::Path;
 use std::process::id;
+use std::rc::Rc;
 use std::string::ParseError;
+use std::sync::{Arc, mpsc};
+use std::thread::{sleep, spawn};
 
 use anyhow::bail;
 
@@ -591,7 +599,14 @@ fn clone_copy() {
     println!("{:?}", d);
 }
 
-//父trait，trait可以继承
+//父trait，trait可以被约束
+/**
+标准库Error定义
+pub trait Error: Debug + Display {
+    // snip
+    fn source(&self) -> Option<&(dyn Error + 'static)> { None }
+}
+ */
 trait Person {
     fn name(&self) -> String;
 }
@@ -676,6 +691,114 @@ fn anyhow2_demo() -> anyhow::Result<i32> {
     Ok(c)
 }
 
+//标准库提供：原生类型和扩展类型
+//原生类型：i32、&str
+//扩展类型：String、Vec<i32>、Option<i32>、Result<i32,E>、Box<i32>
+//Box<i32>将栈分配变为堆分配
+//Vec<i32>有指针、长度、和容量
+//String底层为Vec<u8>，&str指向&[u8]
+//任何实现了 Eq 和 Hash trait 的类型都可以充当 HashMap 的键
+#[derive(Hash, PartialEq, Eq, Debug)]
+struct Account;
+
+fn hashmap_demo() {
+    let mut a = HashMap::new();
+    a.insert("a", "b");
+    a.insert("c", "d");
+    a.insert("1", "2");
+    if let Some(v) = a.get(&"a") {
+        println!("{:?}", v);
+    }
+    if a.contains_key(&"1") {
+        println!("{:?}", "contains 1");
+    }
+    a.remove(&"c");
+    a.insert("1", "3");
+    for (k, &v) in a.iter() {
+        println!("{:?}{}", k, v);
+    }
+    let mut b = HashMap::new();
+    b.insert(Account, "v");
+    println!("{:?}", b);
+}
+
+fn hashset_demo() {
+    let mut a = HashSet::new();
+    a.insert(1);
+    let mut b: HashSet<i32> = vec![1, 2, 3].into_iter().collect();
+    let list: Vec<&i32> = a.union(&b).collect();
+    println!("{:?}", list);
+    println!("{:?}", a.contains(&1));
+}
+
+fn rc_demo() {
+    let a = Rc::new("hello");
+    let b = a.clone();
+    println!("{:?}", a);
+    println!("{:?}", b);
+    drop(b);
+    println!("{:?}", Rc::strong_count(&a));//计数为1
+}
+
+fn arc_demo() {
+    let a = Arc::new("demo");
+    for i in 0..10 {
+        let b = a.clone();
+        spawn(move || {
+            println!("{:?}", b);
+        });
+    }
+    sleep(time::Duration::from_secs(1));
+}
+
+fn chan_demo() {
+    let (sender, receiver) = mpsc::channel();
+    for i in 0..5 {
+        let s = sender.clone();
+        spawn(move || {
+            s.send(format!("hell from {}", i)).unwrap();
+        });
+    }
+    for i in 0..5 {
+        println!("{:?}", receiver.recv().unwrap_or_default());
+    }
+}
+
+fn file_demo() -> anyhow::Result<()> {
+    let path = Path::new("hello.txt");
+    let mut file = File::options().create(true)
+        .read(true)
+        .write(true)
+        .append(true)
+        .open(path)?;
+    // let mut file = File::create(path)?;//只写
+    // let mut file = File::open(path)?;//只读
+    file.write("hello".as_bytes())?;
+    file.write(b"hello2")?;
+    // file.flush()?;
+    // let mut file2 =file.try_clone()?;
+    // let mut s = String::new();
+    // file2.read_to_string(&mut s)?;
+    // println!("{:?}", s);
+    Ok(())
+}
+
+fn args_demo() {
+    let args: Vec<String> = env::args().collect();
+    println!("{:?}", args);
+}
+
+//测试
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fn() {
+        assert_eq!(1, 2);
+    }
+}
+
 fn main() {
-    anyhow2_demo().unwrap();
+    args_demo();
 }
